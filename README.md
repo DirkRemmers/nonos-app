@@ -1,2 +1,5 @@
-# nonos-app
-An app for Nono's kitchen
+# Nonos-app
+Een app voor Nono's kitchen
+
+# Functies
+- Randomize vitrine
