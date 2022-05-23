@@ -255,7 +255,8 @@ recepten_dict = maak_recepten_dicts()
 artikelen_dict = maak_artikelen_dict(recepten_dict)
 
 # kies een modus
-mode = st.selectbox('Wat wil je doen?', ['Browse recepten', 'Randomize de vitrine', 'Voeg recepten toe'])
+# mode = st.selectbox('Wat wil je doen?', ['Browse recepten', 'Randomize de vitrine', 'Voeg recepten toe'])
+mode = st.selectbox('Wat wil je doen?', ['Randomize de vitrine'])
 
 # mode specifieke functies
 if mode == 'Randomize de vitrine':
@@ -279,4 +280,4 @@ if mode == 'Randomize de vitrine':
                     gekozen_artikelen_text = f"{gekozen_artikelen_text}, **_{artikel}_**"
 
             st.markdown(f"Als {soort} gaan we de {gekozen_artikelen_text} soort(en) maken.")
-        st.write(gekozen_artikelen_dict)
+
