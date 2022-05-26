@@ -1,1 +1,1 @@
-{"ingredienten": ["Appel", "Ei", "Meel", "Peer"], "units": ["g", "mg", "L", "mL", "theelepel", "snufje"]}
+{"ingredienten": ["andere gekke dingen", "appels", "blah", "kusjes", "meel", "peren", "snoepjes", "test"], "units": ["g", "mg", "L", "mL", "theelepel", "snufje", "stuks"], "recepten": {"test recept 1": {"aantal personen": 2, "ingredienten": {"appels": {"hoeveelheid": 3, "unit": "stuks"}, "peren": {"hoeveelheid": 2, "unit": "stuks"}, "meel": {"hoeveelheid": 250, "unit": "g"}, "blah": {"hoeveelheid": 8, "unit": "snufje"}}}}}
