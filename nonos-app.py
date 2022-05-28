@@ -1,8 +1,6 @@
-from codecs import ignore_errors
 import streamlit as st
 from collections import defaultdict
 import random
-import pandas as pd
 from streamlit_tags import st_tags
 import json
 
