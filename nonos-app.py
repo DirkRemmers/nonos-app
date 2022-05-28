@@ -1,35 +1,13 @@
+from codecs import ignore_errors
 import streamlit as st
 from collections import defaultdict
 import random
+import pandas as pd
+from streamlit_tags import st_tags
+import json
 
 @st.experimental_memo()
-def maak_recepten_dicts():
-    # dit wordt een lange dict met beschrijvingen van alle recepten. Key beschrijft het artikel en de soort (bijvoorbeeld: tartelette - pecan karamel) 
-
-    recepten_dict = {}
-
-    # monchou taarten - monchou kers
-    recepten_dict['monchou taarten - kers'] = {}
-    recepten_dict['monchou taarten - kers']['ingredienten'] = {
-        'bastogne koeken': {'hoeveelheid': 200, 'unit': 'g'},
-        'monchou': {'hoeveelheid': 200, 'unit': 'g'},
-        'witte basterdsuiker': {'hoeveelheid': 100, 'unit': 'g'},
-        'vanille suiker': {'hoeveelheid': 2, 'unit': 'zakje'},
-        'slagroom': {'hoeveelheid': 250, 'unit': 'mL'},
-        'klopvast': {'hoeveelheid': 1, 'unit': 'zakje'},
-        'kersenvlaaifruit': {'hoeveelheid': 1, 'unit': 'blik'},
-    }
-    recepten_dict['monchou taarten - kers']['bereiding'] = [ 
-    '1: Maal de Bastogne koeken fijn en smelt de boter. Zorg ervoor dat de boter niet bruin wordt.',
-    '2: Mix de Bastognekruimels en de boter en schep het mengsel in de springvorm.',
-    '3: Druk het mengsel aan met de bolle kant van een eetlepel.',
-    '4: ',
-    ]
-
-    return recepten_dict
-
-@st.experimental_memo()
-def maak_artikelen_dict(recepten_dict):
+def maak_artikelen_dict():
     artikelen = defaultdict()
     # tartelletjes
     artikelen['tartelette'] = {}
@@ -184,7 +162,7 @@ def maak_artikelen_dict(recepten_dict):
     artikelen['monchou taarten']['soorten'] = {
         'aardbei':{}, 
         'citroen':{}, 
-        'kers':recepten_dict['monchou taarten - kers'], 
+        'kers':{}, 
         'kokos limoen':{}, 
         'oreo':{}
         }
@@ -245,21 +223,18 @@ def maak_vitrine_zin(soort, gekozen_artikelen_dict):
             gekozen_artikelen_text = f"{gekozen_artikelen_text}, **_{artikel}_**"
 
 # define the main layout of the plotter
-st.set_page_config(page_title="Nono's vitrine randomizer!", page_icon='nono_logo.jpeg', layout = 'wide')
+st.set_page_config(page_title="Nono's app", page_icon='nono_logo.jpeg', layout = 'wide')
 cols = st.columns(2)
 cols[0].image('nono_logo.jpeg', width = 200)
-cols[1].title("Nono's vitrine randomizer!")
-
-# maak alle recepten en organizeer deze
-recepten_dict = maak_recepten_dicts()
-artikelen_dict = maak_artikelen_dict(recepten_dict)
+cols[1].title("Nono's app")
 
 # kies een modus
 # mode = st.selectbox('Wat wil je doen?', ['Browse recepten', 'Randomize de vitrine', 'Voeg recepten toe'])
-mode = st.selectbox('Wat wil je doen?', ['Randomize de vitrine'])
+mode = st.sidebar.radio('Wat wil je doen?', ['Randomize de vitrine', 'Recept invoeren', 'Recept aanpassen', 'Download de data'])
 
 # mode specifieke functies
 if mode == 'Randomize de vitrine':
+    artikelen_dict = maak_artikelen_dict()
     # kies een random set aan artikelen
     if st.button('Wat ga ik deze week maken?'):
         gekozen_artikelen_dict = randomize_artikelen(artikelen_dict)
@@ -281,3 +256,157 @@ if mode == 'Randomize de vitrine':
 
             st.markdown(f"Als {soort} gaan we de {gekozen_artikelen_text} soort(en) maken.")
 
+elif mode == 'Recept invoeren':
+    # vul de titel van dit recept in
+    recept_titel = st.text_input('Hoe heet dit recept?', key = 'recept titel')
+
+    # laadt de data
+    with open('data.json', 'r') as fp:
+        data = json.load(fp)
+
+    # waarschuw dat dit recept er al in staat
+    if recept_titel in data['recepten'].keys():
+        st.warning('Dit recept staat al in de receptenlijst, als je dit wil aanpassen, selecteer de optie "recept aanpassen".')
+        st.stop()
+
+    with st.expander('Voeg de ingredienten toe.', expanded = True):
+
+        # geef aan voor hoeveel personen dit recept is
+        aantal_personen = st.number_input('Voor hoeveel personen is dit recept?', min_value = 0, max_value = 100, step = 1)
+
+        # selecteer alle nodige ingredienten
+        beschikbare_ingredienten_lijst = data['ingredienten'].copy()
+        ingredienten_selectie = st_tags(
+            label = 'Voeg ingredienten toe.',
+            text = 'Druk Enter om toe te voegen',
+            suggestions = beschikbare_ingredienten_lijst,
+            key = 'ingredienten_selectie')
+
+        # sla alle ingredienten op voor toekomstig gebruik als ze nog niet bekend zijn
+        for ingredient in ingredienten_selectie:
+            if ingredient not in beschikbare_ingredienten_lijst:
+                beschikbare_ingredienten_lijst.append(ingredient)
+        beschikbare_ingredienten_lijst = sorted(beschikbare_ingredienten_lijst)
+        if data['ingredienten'] != beschikbare_ingredienten_lijst:
+            data['ingredienten'] = [str.lower(x) for x in beschikbare_ingredienten_lijst]
+            with open('data.json', 'w') as fp:
+                json.dump(data, fp)
+            st.experimental_rerun()
+
+        # laadt de units
+        beschikbare_units_lijst = data['units'].copy()
+
+        new_unit = st.text_input('Vul de naam van de nieuwe soort unit in.')
+        
+        if new_unit != '':
+            if new_unit not in beschikbare_units_lijst:
+                beschikbare_units_lijst.append(new_unit)
+                data['units'] = beschikbare_units_lijst
+                # store eventual new data
+                with open('data.json', 'w') as fp:
+                    json.dump(data, fp)
+                st.experimental_rerun()
+
+        # vul de hoeveelheden en units in per ingredient
+        cols = st.columns(2)
+        nieuw_recept_dict = {}
+        nieuw_recept_dict['aantal personen'] = aantal_personen
+        nieuw_recept_dict['ingredienten'] = {}
+        for ingredient in ingredienten_selectie:
+            nieuw_recept_dict['ingredienten'][ingredient] = {}
+            nieuw_recept_dict['ingredienten'][ingredient]['hoeveelheid'] = cols[0].number_input(f'Hoeveel van {ingredient} heb je nodig?', key = f'{ingredient}_hoeveelheid', min_value = 0)
+            nieuw_recept_dict['ingredienten'][ingredient]['unit'] = cols[1].selectbox('Selecteer ', beschikbare_units_lijst, key = f'{ingredient}_unit')
+
+    if all([x['hoeveelheid'] != 0 for x in nieuw_recept_dict['ingredienten'].values()]) and aantal_personen > 0 and len(ingredienten_selectie) > 0:
+        if st.button("Klik hier om het recept in te voeren."):
+            data['recepten'][recept_titel] = nieuw_recept_dict
+            # store eventual new data
+            with open('data.json', 'w') as fp:
+                json.dump(data, fp)
+            st.success("Het recept is toegevoegd!")
+
+elif mode == 'Recept aanpassen':
+    
+    # laadt de data
+    with open('data.json', 'r') as fp:
+        data = json.load(fp)
+
+    # selecteer het recept wat je wilt aanpassen
+    beschikbare_recepten_lijst = sorted(list(data['recepten'].keys()))
+    recept_selectie = st.selectbox("Kies het recept dat je wilt aanpassen", [''] + beschikbare_recepten_lijst)
+
+    if recept_selectie != '':
+        aantal_personen = st.number_input("Voor hoeveel personen is dit recept?", min_value = 1, max_value=100, step = 1, value = data['recepten'][recept_selectie]['aantal personen'])
+
+        # selecteer alle nodige ingredienten
+        beschikbare_ingredienten_lijst = data['ingredienten'].copy()
+        ingredienten_selectie = st_tags(
+            label = 'Voeg ingredienten toe.',
+            text = 'Druk Enter om toe te voegen',
+            suggestions = beschikbare_ingredienten_lijst,
+            value = list(data['recepten'][recept_selectie]['ingredienten'].keys()),
+            key = 'ingredienten_selectie')
+
+        # sla alle ingredienten op voor toekomstig gebruik als ze nog niet bekend zijn
+        for ingredient in ingredienten_selectie:
+            if ingredient not in beschikbare_ingredienten_lijst:
+                beschikbare_ingredienten_lijst.append(ingredient)
+        beschikbare_ingredienten_lijst = sorted(beschikbare_ingredienten_lijst)
+        if data['ingredienten'] != beschikbare_ingredienten_lijst:
+            data['ingredienten'] = [str.lower(x) for x in beschikbare_ingredienten_lijst]
+            with open('data.json', 'w') as fp:
+                json.dump(data, fp)
+            st.experimental_rerun()
+
+        # laadt de units
+        beschikbare_units_lijst = data['units'].copy()
+
+        new_unit = st.text_input('Vul de naam van de nieuwe soort unit in.')
+        
+        if new_unit != '':
+            if new_unit not in beschikbare_units_lijst:
+                beschikbare_units_lijst.append(new_unit)
+                data['units'] = beschikbare_units_lijst
+                # store eventual new data
+                with open('data.json', 'w') as fp:
+                    json.dump(data, fp)
+                st.experimental_rerun()
+
+        # vul de hoeveelheden en units in per ingredient
+        cols = st.columns(2)
+        aangepast_recept_dict = {}
+        aangepast_recept_dict['aantal personen'] = aantal_personen
+        aangepast_recept_dict['ingredienten'] = {}
+        for ingredient in ingredienten_selectie:
+            if ingredient not in list(data['recepten'][recept_selectie]['ingredienten'].keys()):
+                aangepast_recept_dict['ingredienten'][ingredient] = {}
+                aangepast_recept_dict['ingredienten'][ingredient]['hoeveelheid'] = cols[0].number_input(f'Hoeveel van {ingredient} heb je nodig?', key = f'{ingredient}_hoeveelheid', min_value = 0)
+                aangepast_recept_dict['ingredienten'][ingredient]['unit'] = cols[1].selectbox('Selecteer ', beschikbare_units_lijst, key = f'{ingredient}_unit')
+            else:
+                aangepast_recept_dict['ingredienten'][ingredient] = {}
+                aangepast_recept_dict['ingredienten'][ingredient]['hoeveelheid'] = cols[0].number_input(f'Hoeveel van {ingredient} heb je nodig?', value = data['recepten'][recept_selectie]['ingredienten'][ingredient]['hoeveelheid'], key = f'{ingredient}_hoeveelheid', min_value = 0)
+                aangepaste_unit_lijst = beschikbare_units_lijst.copy()
+                aangepaste_unit_lijst.insert(0, aangepaste_unit_lijst.pop(aangepaste_unit_lijst.index(data['recepten'][recept_selectie]['ingredienten'][ingredient]['unit'])))
+                aangepast_recept_dict['ingredienten'][ingredient]['unit'] = cols[1].selectbox('Selecteer een unit', aangepaste_unit_lijst, key = f'{ingredient}_unit')
+
+        if aangepast_recept_dict != data['recepten'][recept_selectie] and all([x['hoeveelheid'] != 0 for x in aangepast_recept_dict['ingredienten'].values()]) and aantal_personen > 0 and len(ingredienten_selectie) > 0:
+            if st.button("Klik hier om het recept in te voeren."):
+                data['recepten'][recept_selectie] = aangepast_recept_dict
+                with open('data.json', 'w') as fp:
+                    json.dump(data, fp)
+                st.success("Het recept is aangepast!")
+
+elif mode == 'Download de data':
+
+    # laadt de data
+    with open('data.json', 'r') as fp:
+        data = json.load(fp)
+
+    json_string = json.dumps(data)
+
+    st.download_button(
+        label="Download JSON",
+        file_name="data.json",
+        mime="application/json",
+        data=json_string,
+    )
